@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html
+	PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+	 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en-US"
+  xml:lang="en-US">
+  <head>
+    <title>Wordlist</title>
+    <link rel="shortcut icon" href="../theaney.ico" />
+    <link rel="stylesheet" type="text/css" href="default.css" />
+  </head>
+  <body>
+    <h1>Wordlist</h1>
+    <div class="main">
+
+      <p>
+	A few years ago, a friend of mine, Mike, sent me his Fortran
+	program for compressing the wordlists he uses to solve
+	puzzles. I thought it looked vaguely familiar, and sure
+	enough, it is more or less equivalent to the DAWG (Directed
+	Acyclic Word Graph) algorithm used by Crack (and others). This
+	algorithm is described by <a
+	href="http://www.crypticide.com/users/alecm/"> Alec
+	Muffett</a> in the <a
+	href="http://www.crypticide.com/users/alecm/security/c50-faq.html">
+	Crack FAQ</a>:
+      </p>
+
+      <div class="quote">
+      <ol>
+
+	<li>sort the wordlist into normal Unix order. (beware
+	  localization!)</li>
+	
+	<li>for each word that the DAWG preprocessor reads...</li>
+
+	<li>count how many leading characters it shares with the
+	  previous word that was read...</li>
+
+	<li>encode that number as a character from the set [0-9A-Za-z]
+	  for values 0..61 (if the value is >61 then stop there)</li>
+
+	<li>print said character (the encoded number) and the
+	  remaining stem of the word</li>
+
+	<li>end-for-loop </li>
+
+      </ol>
+      </div>
+
+      <p>
+	When I suggested to Mike that he had reinvented a scheme
+	dating to at least 1990, he said no, he first heard about it
+	years ago at a talk given by a Navy Admiral (Grace
+	Hopper?). He wrote
+      </p>
+
+      <div class="quote">
+	<p>
+           I first saw this wordlist scheme used in 1972.  I think it
+           was about 25 years old then.  I have used it to store
+           wordlists on my Atari which had a wopping 48K bytes!
+	</p>
+      </div>
+
+      <p>
+	At the time, I coded it up in Perl and even packaged it all up
+	as a <a
+	href="http://pws.cablespeed.com/~theaney/Compress-DAWG-1.006.tar.gz">
+	proper Perl module</a>.  Note that the version of Crack that I
+	have seems to use a <code>numarr</code> that matches the ASCII
+	table starting at '0', rather than the one implied by the
+	Crack FAQ (described above). That is, to actually decode the
+	<code>dwg</code> files that come with Crack, I have to use the
+	following:
+      </p>
+
+      <pre>
+    use Compress::DAWG numarr => ['0'..'9',':',';','&lt;','=','>',
+                                  '?','@','A'..'Z','[','\\',']',
+                                  '^','_','`','a'..'z'];
+      </pre>
+
+      <p>
+	I thought about making that the default in the module, but I
+	never followed through.  Anyway, I was going to upload the
+	module to <a href="http://cpan.org/"> CPAN</a>, but then I
+	realized that since Mike's alphabet and the alphabet actually
+	used by Crack are both contiguous, the whole thing boils down
+	to just four one-liners:
+      </p>
+
+      <pre>
+    # Mike's compress.
+    perl -ple '@c=split q//;$n=0;$n++ while $p[$n] eq $c[$n];$_=chr
+    64+$n;$_.=join q//, @c[$n..$#c];@p=@c;' words > words.cpt
+
+    # Mike's decompress.
+    perl -ple '@c=split q//;$i=shift @c;$n=(ord $i)-64;$_=join q//,
+    @p[0..$n-1], @c;@p=split q//' words.cpt > words
+
+    # What Crack seems to actually use for compress.
+    perl -ple '@c=split q//;$n=0;$n++ while $p[$n] eq $c[$n];$_=chr
+    48+$n;$_.=join q//, @c[$n..$#c];@p=@c;' words > words.dwg
+
+    # What Crack seems to actually use for decompress.
+    perl -ple '@c=split q//;$i=shift @c;$n=(ord $i)-48;$_=join q//,
+    @p[0..$n-1], @c;@p=split q//' words.dwg > words
+      </pre>
+
+      <p>
+	I decided I was probably the only one interested in such a
+	module.
+      </p>
+
+      <hr />
+
+      <p>
+	Lately, I have become interested in <a
+	href="http://python.org/"> Python</a>, so <a
+	href="http://news.google.com/news?q=september+25,+2005">
+	today</a> I <a href="wordlist.py.txt"> coded it up in
+	Python</a> just for fun. You might use it something like this
+      </p>
+
+      <pre>
+    >>> import wordlist
+    >>> wordlist.compress(['foo', 'foot', 'footle', 'fubar', 'fub'])
+    ['#!xdawg', '0foo', '3t', '4le', '1ubar', '3']
+    >>> 
+      </pre>
+
+      <p>
+	Or perhaps like this
+      </p>
+
+      <pre>
+    #!/usr/bin/python
+
+    import wordlist
+
+    # Compress with DAWG format.
+    inf = open('wubba')
+    outf = open('wubba.dwg', 'w')
+    print "Compressing file", inf.name
+    wordlist.compress(inf, outf, 'DAWG')
+    print "Output written to", outf.name
+
+    # Decompress with Mike format.
+    inf = open('wubba.cpt')
+    outf = open('wubba.out', 'w')
+    print "Decompressing file", inf.name
+    wordlist.decompress(inf, outf, 'Mike')
+    print "Output written to", outf.name
+      </pre>
+
+      <p>
+	Or, more likely, you won't use it at all.
+      </p>
+
+      <hr />
+
+      <p>
+	I am also quite fond of <a href="http://www.ruby-lang.org/">
+	Ruby</a>, but someone called <a
+	href="http://typo.skrud.net/pages/about"> Skrud </a> has
+	already implemented <a
+	href="http://typo.skrud.net/pages/crackrb"> a version of Crack
+	in Ruby</a>, which includes handling <a
+	href="http://skrud.net/files/code/crackrb/dawg.rb"> the DAWG
+	case,</a> so go look at his.
+      </p>
+
+    </div>
+    <hr />
+     <address>
+	<a href="mailto: theaney AT gmail DOT com">Tim Heaney</a>
+      </address>
+  </body>
+</html>
